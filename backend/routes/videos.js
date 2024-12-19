@@ -17,7 +17,6 @@ router.get('/scrape-trending', async (req, res) => {
     const html = await page.content();
     const $ = cheerio.load(html);
     try {
-
         const videos = [];
 
         $('ytd-video-renderer').each((i, elem) => {
@@ -32,20 +31,16 @@ router.get('/scrape-trending', async (req, res) => {
                 `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
             ];
 
-            // Extracting additional fields
             const description = $(elem).find('#description-text').text().trim() || 'No description available';
             const channelTitle = $(elem).find('#channel-name').text().trim() || 'Unknown Channel';
 
-            // Ensure numeric fields have valid values (parse or default to 0)
             const viewCount = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, ''), 10) || 0;
             const likeCount = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, '').split(' ')[0], 10) || 0;
             const dislikeCount = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, '').split(' ')[2], 10) || 0;
             const channelDescription = $(elem).find('.yt-simple-endpoint').text().trim() || 'No channel description available';
 
-            // Ensure that channelSubscribers is a number (default to 0 if invalid)
             const channelSubscribers = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, '').split(' ')[4], 10) || 0;
 
-            // Push the cleaned and valid data into the videos array
             videos.push({
                 videoId,
                 title,
@@ -61,10 +56,8 @@ router.get('/scrape-trending', async (req, res) => {
             });
         });
 
-        // Log the extracted video data for debugging
         console.log(videos);
 
-        // Insert or update videos in the database
         const bulkOps = videos.map(video => ({
             updateOne: {
                 filter: { videoId: video.videoId },
@@ -73,13 +66,24 @@ router.get('/scrape-trending', async (req, res) => {
             }
         }));
 
-        // Only perform bulk write if there are videos to update
         if (bulkOps.length > 0) {
             await Video.bulkWrite(bulkOps);
         }
 
-        // Respond with a success message
-        res.status(200).json({ message: 'Videos scraped successfully.', count: videos.length });
+        // Implement pagination
+        const pageNum = parseInt(req.query.page) || 1; // Current page number (default: 1)
+        const limit = 10; // Number of videos per page
+        const startIndex = (pageNum - 1) * limit; // Calculate starting index
+        const paginatedVideos = videos.slice(startIndex, startIndex + limit); // Get paginated results
+
+        res.status(200).json({
+            message: 'Videos scraped successfully.',
+            page: pageNum,
+            perPage: limit,
+            totalVideos: videos.length,
+            totalPages: Math.ceil(videos.length / limit),
+            videos: paginatedVideos
+        });
     } catch (err) {
         console.error('Error scraping videos:', err);
         res.status(500).json({ message: 'Error scraping videos.' });
