@@ -10,9 +10,15 @@ const router = express.Router();
 // Scrape Trending Videos from YouTube
 // Scrape Trending Videos from YouTube
 router.get('/scrape-trending', async (req, res) => {
-    const browser = await puppeteer.launch({ headless: true });
+
+    const browser = await puppeteer.launch({
+        executablePath: 'C:\Program Files\Google\Chrome\Application\chrome.exe',
+        headless: true
+    });
     const page = await browser.newPage();
     await page.goto('https://www.youtube.com/feed/trending', { waitUntil: 'networkidle2' });
+
+    console.log('Page loaded');
 
     const html = await page.content();
     const $ = cheerio.load(html);
