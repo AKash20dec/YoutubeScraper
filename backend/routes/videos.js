@@ -12,7 +12,7 @@ const router = express.Router();
 router.get('/scrape-trending', async (req, res) => {
 
     const browser = await puppeteer.launch({
-        executablePath: 'C:\Program Files\Google\Chrome\Application\chrome.exe',
+        executablePath: 'C:\Users\yakas\.cache\puppeteer\chrome\win64-131.0.6778.108\chrome-win64\chrome.exe',
         headless: true
     });
     const page = await browser.newPage();
