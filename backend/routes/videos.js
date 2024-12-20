@@ -1,47 +1,63 @@
 const express = require('express');
-const { chromium } = require('playwright');
-const Video = require('../models/video'); // Adjust the path to your Video model
+const axios = require('axios');
+const cheerio = require('cheerio');
+const Video = require('../models/video');
+let fs = require("fs");
+let puppeteer = require("puppeteer");
 
 const router = express.Router();
 
 // Scrape Trending Videos from YouTube
 router.get('/scrape-trending', async (req, res) => {
+    const browser = await puppeteer.launch({
+        headless: true
+    });
+
+    const page = await browser.newPage();
+    await page.goto('https://www.youtube.com/feed/trending', { waitUntil: 'networkidle2' });
+
+    const html = await page.content();
+    const $ = cheerio.load(html);
+
     try {
-        // Launch Playwright browser
-        const browser = await chromium.launch({ headless: true });
-        const page = await browser.newPage();
+        const videos = [];
+        $('ytd-video-renderer').each((i, elem) => {
+            const videoId = $(elem).find('a#thumbnail').attr('href')?.split('=')[1];
+            if (!videoId) return; // Skip if videoId is not present
 
-        // Navigate to YouTube Trending
-        await page.goto('https://www.youtube.com/feed/trending', { waitUntil: 'domcontentloaded' });
+            const title = $(elem).find('a#video-title').text().trim();
+            const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            const thumbnails = [
+                `https://img.youtube.com/vi/${videoId}/default.jpg`,
+                `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+                `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
+            ];
 
-        // Wait for videos to load on the page
-        await page.waitForSelector('ytd-video-renderer');
+            const description = $(elem).find('#description-text').text().trim() || 'No description available';
+            const channelTitle = $(elem).find('#channel-name').text().trim() || 'Unknown Channel';
 
-        // Scrape video details
-        const videos = await page.evaluate(() => {
-            const videoElements = Array.from(document.querySelectorAll('ytd-video-renderer'));
-            return videoElements.map(elem => {
-                const videoId = elem.querySelector('a#thumbnail')?.href.split('=')[1];
-                const title = elem.querySelector('a#video-title')?.innerText.trim();
-                const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-                const thumbnails = [
-                    `https://img.youtube.com/vi/${videoId}/default.jpg`,
-                    `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
-                    `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`
-                ];
-                const description = elem.querySelector('#description-text')?.innerText.trim() || 'No description available';
-                const channelTitle = elem.querySelector('#channel-name')?.innerText.trim() || 'Unknown Channel';
-                const viewCountText = elem.querySelector('.style-scope.ytd-video-meta-block')?.innerText.trim();
-                const viewCount = parseInt(viewCountText?.replace(/[^0-9]/g, '') || '0', 10);
+            const viewCount = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, ''), 10) || 0;
+            const likeCount = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, '').split(' ')[0], 10) || 0;
+            const dislikeCount = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, '').split(' ')[2], 10) || 0;
+            const channelDescription = $(elem).find('.yt-simple-endpoint').text().trim() || 'No channel description available';
 
-                return { videoId, title, videoUrl, thumbnails, description, channelTitle, viewCount };
+            const channelSubscribers = parseInt($(elem).find('.style-scope ytd-video-meta-block').first().text().trim().replace(/[^0-9]/g, '').split(' ')[4], 10) || 0;
+
+            videos.push({
+                videoId,
+                title,
+                videoUrl,
+                thumbnails,
+                description,
+                channelTitle,
+                viewCount,
+                likeCount,
+                dislikeCount,
+                channelDescription,
+                channelSubscribers
             });
         });
 
-        // Close the browser
-        await browser.close();
-
-        // Save or process videos
         const bulkOps = videos.map(video => ({
             updateOne: {
                 filter: { videoId: video.videoId },
@@ -54,13 +70,23 @@ router.get('/scrape-trending', async (req, res) => {
             await Video.bulkWrite(bulkOps);
         }
 
+        const pageNum = parseInt(req.query.page) || 1;
+        const limit = 10;
+        const startIndex = (pageNum - 1) * limit;
+        const paginatedVideos = videos.slice(startIndex, startIndex + limit);
+
         res.status(200).json({
             message: 'Videos scraped successfully.',
-            videos,
+            page: pageNum,
+            perPage: limit,
+            totalVideos: videos.length,
+            totalPages: Math.ceil(videos.length / limit),
+            videos: paginatedVideos
         });
     } catch (err) {
-        console.error('Error scraping videos:', err);
         res.status(500).json({ message: 'Error scraping videos.' });
+    } finally {
+        await browser.close();
     }
 });
 
