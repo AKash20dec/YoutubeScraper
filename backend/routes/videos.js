@@ -7,7 +7,7 @@ let puppeteer = require("puppeteer")
 
 const router = express.Router();
 
-// Scrape Trending Videos from YouTube
+
 // Scrape Trending Videos from YouTube
 router.get('/scrape-trending', async (req, res) => {
 
