@@ -9,10 +9,8 @@ const router = express.Router();
 
 
 router.get('/scrape-trending', async (req, res) => {
-    const browser = await puppeteer.launch({
-        headless: true
-    });
-
+    const browser = await puppeteer.launch({args: ['--no-sandbox']});
+    this.renderer = new Renderer(browser, this.config);
     const page = await browser.newPage();
     await page.goto('https://www.youtube.com/feed/trending', { waitUntil: 'networkidle2' });
 
