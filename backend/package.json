@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -16,6 +16,8 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mongoose": "^8.9.1",
-    "puppeteer": "^23.10.4"
+    "playwright": "^1.49.1",
+    "puppeteer": "^23.10.4",
+    "selenium-webdriver": "^4.27.0"
   }
 }

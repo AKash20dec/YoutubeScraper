@@ -2,30 +2,25 @@ const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const Video = require('../models/video');
-let fs = require("fs")
-let puppeteer = require("puppeteer")
+let fs = require("fs");
+let puppeteer = require("puppeteer");
 
 const router = express.Router();
 
 
-// Scrape Trending Videos
 router.get('/scrape-trending', async (req, res) => {
-
     const browser = await puppeteer.launch({
-        //executablePath: 'C:\Program%20Files\Google\Chrome\Application\chrome.exe',
         headless: true
     });
 
     const page = await browser.newPage();
     await page.goto('https://www.youtube.com/feed/trending', { waitUntil: 'networkidle2' });
 
-    console.log('Page loaded');
-
     const html = await page.content();
     const $ = cheerio.load(html);
+
     try {
         const videos = [];
-
         $('ytd-video-renderer').each((i, elem) => {
             const videoId = $(elem).find('a#thumbnail').attr('href')?.split('=')[1];
             if (!videoId) return; // Skip if videoId is not present
@@ -63,8 +58,6 @@ router.get('/scrape-trending', async (req, res) => {
             });
         });
 
-        console.log(videos);
-
         const bulkOps = videos.map(video => ({
             updateOne: {
                 filter: { videoId: video.videoId },
@@ -77,11 +70,10 @@ router.get('/scrape-trending', async (req, res) => {
             await Video.bulkWrite(bulkOps);
         }
 
-        // Implement pagination
-        const pageNum = parseInt(req.query.page) || 1; // Current page number (default: 1)
-        const limit = 10; // Number of videos per page
-        const startIndex = (pageNum - 1) * limit; // Calculate starting index
-        const paginatedVideos = videos.slice(startIndex, startIndex + limit); // Get paginated results
+        const pageNum = parseInt(req.query.page) || 1;
+        const limit = 10;
+        const startIndex = (pageNum - 1) * limit;
+        const paginatedVideos = videos.slice(startIndex, startIndex + limit);
 
         res.status(200).json({
             message: 'Videos scraped successfully.',
@@ -92,7 +84,6 @@ router.get('/scrape-trending', async (req, res) => {
             videos: paginatedVideos
         });
     } catch (err) {
-        console.error('Error scraping videos:', err);
         res.status(500).json({ message: 'Error scraping videos.' });
     } finally {
         await browser.close();
