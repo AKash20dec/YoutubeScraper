@@ -8,7 +8,7 @@ let puppeteer = require("puppeteer")
 const router = express.Router();
 
 
-
+// Scrape Trending Videos
 router.get('/scrape-trending', async (req, res) => {
 
     const browser = await puppeteer.launch({
