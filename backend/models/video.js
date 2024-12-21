@@ -15,4 +15,4 @@ const videoSchema = new mongoose.Schema({
     channelSubscribers: Number,
 }, { timestamps: true });
 
-module.exports = mongoose.model('Video', videoSchema); //videos
+module.exports = mongoose.model('Video', videoSchema); 
